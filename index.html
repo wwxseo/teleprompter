@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
+  />
+  <meta name="theme-color" content="#0b0b0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Teleprompter" />
+  <title>Teleprompter / 提词器</title>
+
+  <link rel="manifest" href="./manifest.json" />
+
+  <style>
+    :root {
+      --bg: #0b0b0f;
+      --panel: #151821;
+      --panel-2: #1d2230;
+      --text: #ffffff;
+      --muted: #a7b0c0;
+      --line: #2a3142;
+      --accent: #4f8cff;
+      --accent-hover: #3d79eb;
+      --danger: #ff5d5d;
+      --success: #28c76f;
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(11, 11, 15, 0.96);
+      backdrop-filter: blur(10px);
+      position: relative;
+      z-index: 10;
+    }
+
+    .brand {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .main {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    .sidebar {
+      width: 360px;
+      max-width: 100%;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .section {
+      margin-bottom: 18px;
+      padding: 14px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    .hint {
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 220px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #0f1320;
+      color: var(--text);
+      padding: 12px;
+      font-size: 15px;
+      line-height: 1.7;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: 84px 1fr 56px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .control-row label {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .control-row input[type="range"] {
+      width: 100%;
+    }
+
+    .value {
+      text-align: right;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .btn-group {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.2s ease;
+      color: white;
+      background: #2d3447;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+    }
+
+    .btn-success {
+      background: var(--success);
+    }
+
+    .stage-wrap {
+      flex: 1;
+      position: relative;
+      min-width: 0;
+      background:
+        radial-gradient(circle at center, rgba(79, 140, 255, 0.08), transparent 35%),
+        linear-gradient(180deg, #090a0f 0%, #0d1018 100%);
+      overflow: hidden;
+    }
+
+    .guide-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 22%;
+      height: 2px;
+      background: rgba(255,255,255,0.14);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .guide-label {
+      position: absolute;
+      top: calc(22% - 26px);
+      right: 16px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      z-index: 2;
+      pointer-events: none;
+      background: rgba(0,0,0,0.25);
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .prompter-viewport {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .prompter-content {
+      position: absolute;
+      left: 50%;
+      width: min(92%, 980px);
+      transform: translateX(-50%);
+      text-align: center;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.7;
+      font-weight: 700;
+      color: #ffffff;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.45);
+      user-select: none;
+      padding: 0 8px 80px;
+    }
+
+    .mirrored {
+      transform: translateX(-50%) scaleX(-1);
+    }
+
+    .status-bar {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,0,0,0.38);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.82);
+      backdrop-filter: blur(10px);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #7b8498;
+    }
+
+    .dot.running {
+      background: #28c76f;
+      box-shadow: 0 0 0 6px rgba(40, 199, 111, 0.14);
+    }
+
+    .mobile-toggle {
+      display: none;
+    }
+
+    .footer-tip {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-top: 8px;
+    }
+
+    .install-tip {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #dce7ff;
+      background: rgba(79, 140, 255, 0.12);
+      border: 1px solid rgba(79, 140, 255, 0.3);
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: none;
+    }
+
+    @media (max-width: 900px) {
+      .main {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        max-height: 48vh;
+      }
+
+      .stage-wrap {
+        min-height: 52vh;
+      }
+
+      .mobile-toggle {
+        display: inline-flex;
+      }
+    }
+
+    .hide-sidebar .sidebar {
+      display: none;
+    }
+
+    .hide-sidebar .main {
+      display: block;
+    }
+
+    .hide-sidebar .stage-wrap {
+      height: calc(100vh - 61px);
+    }
+
+    .full-prompter .topbar,
+    .full-prompter .sidebar {
+      display: none !important;
+    }
+
+    .full-prompter .main {
+      display: block;
+      height: 100vh;
+    }
+
+    .full-prompter .stage-wrap {
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="topbar">
+      <div class="brand">Teleprompter / 提词器</div>
+      <div class="top-actions">
+        <button id="toggleSidebarBtn" class="mobile-toggle">隐藏面板</button>
+        <button id="mirrorBtn">镜像：关</button>
+        <button id="fullscreenBtn">全屏</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <aside class="sidebar" id="sidebar">
+        <div class="section">
+          <div class="section-title">输入口播内容</div>
+          <textarea id="scriptInput" placeholder="把你的口播台词粘贴到这里。
+
+建议写法：
+1. 一行一句
+2. 尽量短句
+3. 不要写成长段大论文
+
+例如：
+Hello, this is Funtek.
+We supply premium sintered stone slabs.
+Suitable for countertops, walls, and custom projects.
+Contact us for sizes, thickness, and quotation."></textarea>
+
+          <div class="install-tip" id="installTip">
+            这个网页支持安装到主屏幕。iPhone 上可用 Safari 打开，然后点“分享 → 添加到主屏幕”。
+          </div>
+
+          <div class="footer-tip">
+            小建议：一行一句最好读。手机拍视频时，台词越短越自然。
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">控制面板</div>
+          <div class="controls">
+            <div class="control-row">
+              <label for="speedRange">速度</label>
+              <input id="speedRange" type="range" min="0.2" max="5" step="0.1" value="1.2">
+              <div class="value"><span id="speedValue">1.2</span>x</div>
+            </div>
+
+            <div class="control-row">
+              <label for="fontRange">字体</label>
+              <input id="fontRange" type="range" min="24" max="96" step="1" value="46">
+              <div class="value"><span id="fontValue">46</span>px</div>
+            </div>
+
+            <div class="control-row">
+              <label for="lineHeightRange">行高</label>
+              <input id="lineHeightRange" type="range" min="1.2" max="2.4" step="0.1" value="1.7">
+              <div class="value"><span id="lineHeightValue">1.7</span></div>
+            </div>
+
+            <div class="control-row">
+              <label for="paddingTopRange">起始位</label>
+              <input id="paddingTopRange" type="range" min="10" max="180" step="1" value="100">
+              <div class="value"><span id="paddingTopValue">100</span>%</div>
+            </div>
+          </div>
+
+          <div style="height: 12px;"></div>
+
+          <div class="btn-group">
+            <button id="startBtn" class="btn-success">开始</button>
+            <button id="pauseBtn">暂停</button>
+            <button id="resetBtn" class="btn-danger">重置</button>
+            <button id="applyBtn" class="btn-primary">应用文字</button>
+          </div>
+
+          <div class="footer-tip">
+            快捷键：空格 = 开始/暂停，R = 重置，F = 全屏，M = 镜像
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">使用建议</div>
+          <div class="hint">
+            1. 先把台词拆成短句。<br>
+            2. 一句一行，读起来最自然。<br>
+            3. 拍摄时眼睛尽量看靠近镜头的位置。<br>
+            4. 如果用反射提词器，可以开启“镜像”。<br>
+            5. 先试速度，再正式拍。
+          </div>
+        </div>
+      </aside>
+
+      <section class="stage-wrap">
+        <div class="guide-line"></div>
+        <div class="guide-label">建议视线区</div>
+
+        <div class="prompter-viewport" id="viewport">
+          <div class="prompter-content" id="prompterText">
+欢迎使用提词器
+
+把左侧文字贴进来
+点击“应用文字”
+再点击“开始”
+
+建议一行一句
+这样最适合手机口播拍摄
+          </div>
+        </div>
+
+        <div class="status-bar">
+          <span class="dot" id="statusDot"></span>
+          <span id="statusText">已暂停</span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const app = document.getElementById("app");
+    const scriptInput = document.getElementById("scriptInput");
+    const prompterText = document.getElementById("prompterText");
+    const viewport = document.getElementById("viewport");
+
+    const speedRange = document.getElementById("speedRange");
+    const fontRange = document.getElementById("fontRange");
+    const lineHeightRange = document.getElementById("lineHeightRange");
+    const paddingTopRange = document.getElementById("paddingTopRange");
+
+    const speedValue = document.getElementById("speedValue");
+    const fontValue = document.getElementById("fontValue");
+    const lineHeightValue = document.getElementById("lineHeightValue");
+    const paddingTopValue = document.getElementById("paddingTopValue");
+
+    const startBtn = document.getElementById("startBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const applyBtn = document.getElementById("applyBtn");
+    const mirrorBtn = document.getElementById("mirrorBtn");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
+    const toggleSidebarBtn = document.getElementById("toggleSidebarBtn");
+    const installTip = document.getElementById("installTip");
+
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+
+    let animationId = null;
+    let isRunning = false;
+    let isMirrored = false;
+    let y = 0;
+    let lastTimestamp = 0;
+
+    function saveSettings() {
+      const settings = {
+        script: scriptInput.value,
+        speed: speedRange.value,
+        font: fontRange.value,
+        lineHeight: lineHeightRange.value,
+        paddingTop: paddingTopRange.value,
+        mirrored: isMirrored
+      };
+      localStorage.setItem("teleprompter_settings", JSON.stringify(settings));
+    }
+
+    function loadSettings() {
+      try {
+        const raw = localStorage.getItem("teleprompter_settings");
+        if (!raw) return;
+        const settings = JSON.parse(raw);
+
+        if (typeof settings.script === "string") scriptInput.value = settings.script;
+        if (settings.speed) speedRange.value = settings.speed;
+        if (settings.font) fontRange.value = settings.font;
+        if (settings.lineHeight) lineHeightRange.value = settings.lineHeight;
+        if (settings.paddingTop) paddingTopRange.value = settings.paddingTop;
+        if (typeof settings.mirrored === "boolean") isMirrored = settings.mirrored;
+      } catch (e) {}
+    }
+
+    function updateControlLabels() {
+      speedValue.textContent = speedRange.value;
+      fontValue.textContent = fontRange.value;
+      lineHeightValue.textContent = lineHeightRange.value;
+      paddingTopValue.textContent = paddingTopRange.value;
+    }
+
+    function applyText() {
+      const value = scriptInput.value.trim();
+      prompterText.textContent = value || "请先输入你的台词内容";
+      applyStyles();
+      resetPosition();
+      saveSettings();
+    }
+
+    function applyStyles() {
+      prompterText.style.fontSize = fontRange.value + "px";
+      prompterText.style.lineHeight = lineHeightRange.value;
+
+      if (isMirrored) {
+        prompterText.classList.add("mirrored");
+        mirrorBtn.textContent = "镜像：开";
+      } else {
+        prompterText.classList.remove("mirrored");
+        mirrorBtn.textContent = "镜像：关";
+      }
+
+      updateControlLabels();
+      saveSettings();
+    }
+
+    function resetPosition() {
+      stopScroll();
+      const startPercent = parseFloat(paddingTopRange.value || "100");
+      y = viewport.clientHeight * (startPercent / 100);
+      renderPosition();
+      setStatus(false);
+    }
+
+    function renderPosition() {
+      prompterText.style.top = y + "px";
+    }
+
+    function tick(timestamp) {
+      if (!isRunning) return;
+
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const delta = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
+
+      const speed = parseFloat(speedRange.value) * 22;
+      y -= speed * (delta / 16.67);
+      renderPosition();
+
+      const textBottom = y + prompterText.offsetHeight;
+      if (textBottom < -40) {
+        stopScroll();
+        setStatus(false, "播放结束");
+        return;
+      }
+
+      animationId = requestAnimationFrame(tick);
+    }
+
+    function startScroll() {
+      if (isRunning) return;
+      isRunning = true;
+      lastTimestamp = 0;
+      setStatus(true);
+      animationId = requestAnimationFrame(tick);
+    }
+
+    function stopScroll() {
+      isRunning = false;
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+      lastTimestamp = 0;
+    }
+
+    function toggleScroll() {
+      if (isRunning) {
+        stopScroll();
+        setStatus(false);
+      } else {
+        startScroll();
+      }
+    }
+
+    function setStatus(running, customText) {
+      if (running) {
+        statusDot.classList.add("running");
+        statusText.textContent = customText || "滚动中";
+      } else {
+        statusDot.classList.remove("running");
+        statusText.textContent = customText || "已暂停";
+      }
+    }
+
+    function toggleMirror() {
+      isMirrored = !isMirrored;
+      applyStyles();
+    }
+
+    async function toggleFullscreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await app.requestFullscreen();
+          app.classList.add("full-prompter");
+        } else {
+          await document.exitFullscreen();
+          app.classList.remove("full-prompter");
+        }
+      } catch (e) {}
+    }
+
+    function syncFullscreenState() {
+      if (document.fullscreenElement) {
+        app.classList.add("full-prompter");
+      } else {
+        app.classList.remove("full-prompter");
+      }
+    }
+
+    function toggleSidebar() {
+      app.classList.toggle("hide-sidebar");
+      toggleSidebarBtn.textContent = app.classList.contains("hide-sidebar") ? "显示面板" : "隐藏面板";
+    }
+
+    startBtn.addEventListener("click", startScroll);
+    pauseBtn.addEventListener("click", () => {
+      stopScroll();
+      setStatus(false);
+    });
+    resetBtn.addEventListener("click", resetPosition);
+    applyBtn.addEventListener("click", applyText);
+    mirrorBtn.addEventListener("click", toggleMirror);
+    fullscreenBtn.addEventListener("click", toggleFullscreen);
+    toggleSidebarBtn.addEventListener("click", toggleSidebar);
+
+    speedRange.addEventListener("input", () => {
+      updateControlLabels();
+      saveSettings();
+    });
+    fontRange.addEventListener("input", applyStyles);
+    lineHeightRange.addEventListener("input", applyStyles);
+    paddingTopRange.addEventListener("input", () => {
+      updateControlLabels();
+      saveSettings();
+    });
+
+    scriptInput.addEventListener("input", saveSettings);
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+
+    document.addEventListener("keydown", (e) => {
+      const tag = document.activeElement.tagName.toLowerCase();
+      const typing = tag === "textarea" || tag === "input";
+
+      if (e.code === "Space" && !typing) {
+        e.preventDefault();
+        toggleScroll();
+      }
+
+      if ((e.key === "r" || e.key === "R") && !typing) {
+        resetPosition();
+      }
+
+      if ((e.key === "f" || e.key === "F") && !typing) {
+        toggleFullscreen();
+      }
+
+      if ((e.key === "m" || e.key === "M") && !typing) {
+        toggleMirror();
+      }
+    });
+
+    window.addEventListener("resize", renderPosition);
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
+
+    function showInstallHint() {
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      const isInStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+
+      if (isIOS && !isInStandalone) {
+        installTip.style.display = "block";
+      }
+    }
+
+    loadSettings();
+    updateControlLabels();
+    applyStyles();
+    applyText();
+    showInstallHint();
+  </script>
+</body>
+</html>
